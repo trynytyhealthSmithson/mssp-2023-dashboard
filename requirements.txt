@@ -3,4 +3,5 @@ pandas
 plotly
 statsmodels
 numpy
+python-pptx
 
