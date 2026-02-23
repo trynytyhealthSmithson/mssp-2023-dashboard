@@ -1,3 +1,10 @@
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
+from pptx.oxml.xmlchemy import OxmlElement  # Correct import for OxmlElement
+from io import BytesIO
+import plotly.io as pio
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -29,6 +36,181 @@ st.markdown(f"""
         /* Add more if needed, but keep minimal */
     </style>
 """, unsafe_allow_html=True)
+
+# ── PPTX Export Function (fixed - no longer requires savings_to_cms_m) ────────
+def generate_pptx_report(aco_data, df, track_avg):
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)   # 16:9 wide layout
+    prs.slide_height = Inches(7.5)
+
+    # ── Colors ───────────────────────────────────────────────────────────────
+    from pptx.dml.color import RGBColor
+    def hex_to_rgb(h): return tuple(int(h.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+    primary_rgb = hex_to_rgb(PRIMARY) if PRIMARY.startswith('#') else (51, 91, 116)
+    text_rgb    = (40, 40, 40)
+    gray_rgb    = (120, 120, 120)
+    light_bg_rgb = (250, 250, 252)
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+    def set_background(slide):
+        fill = slide.background.fill
+        fill.solid()
+        fill.fore_color.rgb = RGBColor(*light_bg_rgb)
+
+    def set_footer(slide):
+        left, top, w, h = Inches(0.5), Inches(7.0), Inches(12.3), Inches(0.3)
+        txBox = slide.shapes.add_textbox(left, top, w, h)
+        tf = txBox.text_frame
+        p = tf.add_paragraph()
+        p.text = f"PY 2023 MSSP Dashboard | Data: CMS PUF | Generated {pd.Timestamp.now().strftime('%Y-%m-%d')}"
+        p.font.size = Pt(9)
+        p.font.color.rgb = RGBColor(*gray_rgb)
+
+    def add_title_slide():
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        set_background(slide)
+        title = slide.shapes.title
+        title.text = "Medicare Shared Savings Program – PY 2023 Dashboard Report"
+        title.text_frame.paragraphs[0].font.color.rgb = RGBColor(*primary_rgb)
+        subtitle = slide.placeholders[1]
+        subtitle.text = (
+            f"Generated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M CST')}\n"
+            "Chicago, Illinois | @ASmithson1987\n"
+            f"Selected ACO: {aco_data.get('ACO_Name', 'N/A')} ({aco_data.get('ACO_ID', 'N/A')})"
+        )
+        set_footer(slide)
+
+    def add_section_title(title):
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        set_background(slide)
+        title_shape = slide.shapes.title
+        title_shape.text = title
+        title_shape.text_frame.paragraphs[0].font.color.rgb = RGBColor(*primary_rgb)
+        set_footer(slide)
+        return slide
+
+    def add_bullet_slide(title, bullets):
+        slide = add_section_title(title)
+        tf = slide.placeholders[1].text_frame
+        for line in bullets:
+            p = tf.add_paragraph()
+            p.text = line.strip()
+            p.level = 1 if line.startswith("- ") else 0
+            p.font.size = Pt(18)
+            p.font.color.rgb = RGBColor(*text_rgb)
+
+    def add_table_slide(title, data_dict):
+        slide = add_section_title(title)
+        rows = len(next(iter(data_dict.values()))) + 1
+        cols = len(data_dict)
+        left, top, width, height = Inches(0.5), Inches(1.2), Inches(12.3), Inches(0.28 * rows)
+        table = slide.shapes.add_table(rows, cols, left, top, width, height).table
+
+        # Headers
+        for c, hdr in enumerate(data_dict):
+            cell = table.cell(0, c)
+            cell.text = hdr
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(*primary_rgb)
+            p = cell.text_frame.paragraphs[0]
+            run = p.runs[0] if p.runs else p.add_run()
+            run.font.color.rgb = RGBColor(255, 255, 255)
+            run.font.bold = True
+            run.font.size = Pt(13)
+
+        # Data + alternating rows
+        for r in range(rows):
+            for c in range(cols):
+                cell = table.cell(r, c)
+                if r == 0: continue
+                cell.text = str(list(data_dict.values())[c][r-1])
+                p = cell.text_frame.paragraphs[0]
+                run = p.runs[0] if p.runs else p.add_run()
+                run.font.size = Pt(11)
+                run.font.color.rgb = RGBColor(*text_rgb)
+                if r % 2 == 1:
+                    cell.fill.solid()
+                    cell.fill.fore_color.rgb = RGBColor(245, 247, 250)
+
+        set_footer(slide)
+
+    def add_metrics_slide(title, metrics):
+        slide = add_section_title(title)
+        left, top, card_w, card_h, spacing = Inches(0.7), Inches(1.4), Inches(2.3), Inches(1.6), Inches(0.3)
+        for i, (label, value) in enumerate(metrics):
+            x = left + i * (card_w + spacing)
+            shape = slide.shapes.add_textbox(x, top, card_w, card_h)
+            tf = shape.text_frame
+            tf.clear()
+            line = shape.line
+            line.color.rgb = RGBColor(*primary_rgb)
+            line.width = Pt(1.2)
+            p1 = tf.add_paragraph(); p1.text = value; p1.font.bold = True; p1.font.size = Pt(30); p1.font.color.rgb = RGBColor(*primary_rgb); p1.alignment = PP_ALIGN.CENTER
+            p2 = tf.add_paragraph(); p2.text = label; p2.font.size = Pt(13); p2.font.color.rgb = RGBColor(*text_rgb); p2.alignment = PP_ALIGN.CENTER
+        set_footer(slide)
+
+    # ── Slides ────────────────────────────────────────────────────────────────
+    add_title_slide()
+
+    add_bullet_slide("PY 2023 Program Highlights", [
+        "- Shift to sliding-scale quality scoring (partial savings + health equity bonus up to 10 points)",
+        "- Expanded primary care service codes for prospective assignment",
+        "- Continued EUC flexibilities (all ACOs DisAffQual=1 due to COVID-19 PHE)",
+        "- Record net savings to Medicare: $2.1B (largest in program history)",
+        "- Quality improvements across many measures vs PY 2022"
+    ])
+
+    changes_data = {
+        "Aspect": ["Quality Scoring", "EUC/DisAffQual", "Assignment Codes", "Risk/County Data", "Savings/Losses Calc"],
+        "PY 2023 Handling": [
+            "Sliding scale + health equity bonus possible",
+            "All ACOs flagged =1 (COVID-19 PHE)",
+            "Expanded primary care codes",
+            "Suppression rules unchanged (1-10 suppressed)",
+            "Sliding scale sharing; no MSR waiver changes"
+        ],
+        "Impact on Data": [
+            "QualScore reflects MIPS + bonus; affects EarnSaveLoss",
+            "Applies to quality/financial adjustments",
+            "May increase N_AB in some ACOs",
+            "Weighted risk scores use valid PY data only",
+            "GenSaveLoss/EarnSaveLoss quality-adjusted"
+        ],
+        "Source": [
+            "CY 2023 PFS Final Rule",
+            "Data Dictionary (DisAffQual)",
+            "Final Rule assignment updates",
+            "County-Level FFS Methodology PUF",
+            "Data Dictionary + Final Rule"
+        ]
+    }
+    add_table_slide("Key Technical/Data Changes in PY 2023 PUF", changes_data)
+
+    add_bullet_slide("Data Sources & Methodology", [
+        "- Primary: PY 2023 ACO Results PUF (CMS)",
+        "- All ACOs DisAffQual=1 (COVID-19 PHE)",
+        "- Small cell suppression: 1–10 assignable beneficiaries suppressed",
+        "- Regional FFS & risk scores per County-Level PUF",
+        "- Regulations: 42 CFR Part 425",
+        "- Generated from Streamlit MSSP Dashboard"
+    ])
+
+    total_generated_m = df['GenSaveLoss'].sum(skipna=True) / 1_000_000
+    total_earned_m = df['EarnSaveLoss'].sum(skipna=True) / 1_000_000
+    savings_to_cms_m = (df['GenSaveLoss'].sum(skipna=True) - df['EarnSaveLoss'].sum(skipna=True)) / 1_000_000
+    metrics = [
+        ("Total ACOs", f"{len(df):,}"),
+        ("Assigned Beneficiaries", fmt_comma(df['N_AB'].sum())),
+        ("Generated Savings", f"${total_generated_m:,.2f}M"),
+        ("Earned by ACOs", f"${total_earned_m:,.2f}M"),
+        ("Net to CMS", f"${savings_to_cms_m:,.2f}M")
+    ]
+    add_metrics_slide("Program-Wide Overview (PY 2023)", metrics)
+
+    bio = BytesIO()
+    prs.save(bio)
+    bio.seek(0)
+    return bio.getvalue()
 
 # ── Load & Prepare Data ──────────────────────────────────────────────────────
 @st.cache_data
@@ -70,7 +252,6 @@ def load_data():
 
     # PY weighted risk score (skips suppressed categories)
     def calculate_weighted_risk_py(row):
-        # Convert risk scores and person-years, treating * , - , blank as NaN
         risk_scores = {
             "ESRD": pd.to_numeric(row.get("CMS_HCC_RiskScore_ESRD_PY"), errors='coerce'),
             "Disabled": pd.to_numeric(row.get("CMS_HCC_RiskScore_DIS_PY"), errors='coerce'),
@@ -85,7 +266,6 @@ def load_data():
             "Aged Non-Dual": pd.to_numeric(row.get("N_AB_Year_AGED_NonDual_PY"), errors='coerce')
         }
 
-        # Only include categories that have BOTH a valid risk score AND positive person-years
         valid_terms = []
         total_weight = 0.0
 
@@ -105,7 +285,6 @@ def load_data():
 
     # BY3 weighted risk score (same logic as PY)
     def calculate_weighted_risk_by3(row):
-        # Convert risk scores and person-years, treating * , - , blank as NaN
         risk_scores = {
             "ESRD": pd.to_numeric(row.get("CMS_HCC_RiskScore_ESRD_BY3"), errors='coerce'),
             "Disabled": pd.to_numeric(row.get("CMS_HCC_RiskScore_DIS_BY3"), errors='coerce'),
@@ -120,7 +299,6 @@ def load_data():
             "Aged Non-Dual": pd.to_numeric(row.get("N_AB_Year_AGED_NonDual_BY3"), errors='coerce')
         }
 
-        # Only include categories that have BOTH a valid risk score AND positive person-years
         valid_terms = []
         total_weight = 0.0
 
@@ -323,10 +501,9 @@ if tab_selection == "Overview":
                       title="Raw Savings vs Earned by ACOs", color_discrete_sequence=["#42BA97", "#B381D9"])
         fig2.update_layout(template=PLOTLY_TEMPLATE, yaxis_tickformat="$,.0f")
         st.plotly_chart(fig2, use_container_width=True)
-
     colP1, colP2 = st.columns(2)
     # Define pie colors based on current theme (reuses your variables)
-    pie_colors = [PRIMARY, ACCENT, NEUTRAL, "#636EFA", "#EF553B"]  # fallback + theme colors
+    pie_colors = [PRIMARY, ACCENT, NEUTRAL, "#636EFA", "#EF553B"] # fallback + theme colors
     with colP1:
         fig_aco_pie = px.pie(
             agg,
@@ -334,7 +511,7 @@ if tab_selection == "Overview":
             names="Current_Track",
             title="ACOs by Track",
             hole=0.4,
-            color_discrete_sequence=pie_colors  # ← custom colors
+            color_discrete_sequence=pie_colors # ← custom colors
         )
         fig_aco_pie.update_layout(
             template=PLOTLY_TEMPLATE,
@@ -349,7 +526,7 @@ if tab_selection == "Overview":
             names="Current_Track",
             title="Beneficiaries by Track",
             hole=0.4,
-            color_discrete_sequence=pie_colors  # ← same custom colors
+            color_discrete_sequence=pie_colors # ← same custom colors
         )
         fig_benef_pie.update_layout(
             template=PLOTLY_TEMPLATE,
@@ -357,7 +534,6 @@ if tab_selection == "Overview":
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig_benef_pie, use_container_width=True)
-
     # ── Moved from Charts tab: Quality & Performance Visuals ──────────────────
     st.markdown("---")
     st.subheader("Quality & Performance Visuals (PY 2023)")
@@ -732,6 +908,18 @@ elif tab_selection == "Single ACO View":
                 file_name=f"{aco_data['ACO_Name']}_2023.csv",
                 mime="text/csv"
             )
+
+            # ── PPTX Export Button ───────────────────────────────────────────────
+            if st.button("Export Full Report (PPTX)"):
+                pptx_bytes = generate_pptx_report(aco_data, df, track_avg)
+                st.download_button(
+                    label="Download PPTX Now",
+                    data=pptx_bytes,
+                    file_name=f"MSSP_PY2023_Report_{aco_data.get('ACO_ID', 'SelectedACO')}.pptx",
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    key=f"pptx_{aco_data.get('ACO_ID')}"
+                )
+
             # Nested expanders for details
             with st.expander("Total Benchmark Components"):
                 st.write("**Calculation**: Historical Benchmark + Regional/Trend Adjustment = Final Benchmark")
@@ -898,7 +1086,7 @@ elif tab_selection == "Single ACO View":
             aggregate_admits = admits_per_1000 * (aco_data.get("N_AB_Year_PY", 0) / 1000) if aco_data.get("N_AB_Year_PY", 0) > 0 else 0
             total_exp = aco_data.get(capann_col, 0) * aco_data.get("N_AB_Year_PY", 0)
             cost_per_admit = total_exp / aggregate_admits if aggregate_admits > 0 else 0
-            cost_per_benef = total_exp / aco_data.get("N_AB_Year_PY", 1) if aco_data.get("N_ABYear_PY", 1) > 0 else 0
+            cost_per_benef = total_exp / aco_data.get("N_AB_Year_PY", 1) if aco_data.get("N_AB_Year_PY", 1) > 0 else 0
             pmpm = cost_per_benef / 12
             inpatient_table.append({
                 "Inpatient Type": typ["Name"],
@@ -1157,7 +1345,6 @@ elif tab_selection == "Single ACO View":
             st.plotly_chart(fig_scat, use_container_width=True)
         else:
             st.info("Missing columns for scatter plot (P_EM_PCP_Vis, BnchmkMinExp, QualScore, N_AB, ACO_ID).")
-
         # PCP Services vs Raw Savings Per Beneficiary Scatter Plot (Fallback Size)
         st.markdown("### PCP Services vs Raw Savings Per Beneficiary")
         st.write("Scatter plot across all ACOs: PCP E&M visits per 1,000 person-years vs raw savings per beneficiary. Selected ACO bubble larger (scaled by risk score). Trend line added.")
@@ -1172,7 +1359,7 @@ elif tab_selection == "Single ACO View":
                 plot_df,
                 x="P_EM_PCP_Vis",
                 y="Raw_Savings_Per_Benef",
-                size=size,  # Now uses the safe list
+                size=size, # Now uses the safe list
                 trendline="ols",
                 trendline_scope="overall",
                 trendline_color_override="#A5D8FF",
@@ -1216,7 +1403,6 @@ elif tab_selection == "Single ACO View":
             st.plotly_chart(fig_scat_per, use_container_width=True)
         else:
             st.info("Missing columns for per-beneficiary scatter plot (P_EM_PCP_Vis, BnchmkMinExp, N_AB_Year_PY, ACO_ID).")
-
         # 6. Utilization Comparison – FIXED ORDER VERSION
         st.markdown("### Utilization Comparison")
         st.write("Bar chart of per capita cost across all ACOs (ascending order: lowest/left = most efficient → highest/right = least efficient). Selected ACO highlighted in theme color.")
@@ -1230,21 +1416,21 @@ elif tab_selection == "Single ACO View":
             all_df = all_df.sort_values(cost_col, ascending=True, na_position='last').reset_index(drop=True)
             # Highlight/color AFTER sort
             all_df["Highlight"] = all_df["ACO_ID"] == aco_data["ACO_ID"]
-            all_df["Color"] = all_df["Highlight"].map({True: PRIMARY, False: NEUTRAL})  # ← use PRIMARY for highlight, NEUTRAL for others
+            all_df["Color"] = all_df["Highlight"].map({True: PRIMARY, False: NEUTRAL}) # ← use PRIMARY for highlight, NEUTRAL for others
             # Add index as x (forces correct sorted order)
             all_df["Index"] = all_df.index
             fig_bar = px.bar(
                 all_df,
-                x="Index",  # Use numeric index instead of name
+                x="Index", # Use numeric index instead of name
                 y=cost_col,
                 color="Color",
-                color_discrete_map={PRIMARY: PRIMARY, NEUTRAL: NEUTRAL},  # ← map to theme colors
+                color_discrete_map={PRIMARY: PRIMARY, NEUTRAL: NEUTRAL}, # ← map to theme colors
                 title=f"{cat} – Per Capita Cost Across All ACOs (Selected ACO in Theme Color)",
                 labels={cost_col: "Per Capita Cost ($)"},
                 hover_data=["ACO_Name", cost_col]
             )
             # Custom x-axis: only show selected ACO name at its position
-            ticktext = ["" for _ in all_df.index]  # blank everywhere
+            ticktext = ["" for _ in all_df.index] # blank everywhere
             if all_df["Highlight"].any():
                 selected_idx = all_df[all_df["Highlight"]].index[0]
                 ticktext[selected_idx] = aco_data["ACO_Name"]
@@ -1252,7 +1438,7 @@ elif tab_selection == "Single ACO View":
                 template=PLOTLY_TEMPLATE,
                 xaxis={
                     'tickmode': 'array',
-                    'tickvals': list(range(len(all_df))),  # 0,1,2,... positions
+                    'tickvals': list(range(len(all_df))), # 0,1,2,... positions
                     'ticktext': ticktext,
                 },
                 xaxis_tickangle=-45,
@@ -1262,7 +1448,6 @@ elif tab_selection == "Single ACO View":
             # Fixed hover: ACO name + formatted cost
             fig_bar.update_traces(hovertemplate="%{customdata[0]}<br>Per Capita Cost: $%{y:,.0f}")
             st.plotly_chart(fig_bar, use_container_width=True)
-
         # New: 4. Outlier Detection in Admissions/LOS
         st.markdown("### Outlier Detection in Admissions & LOS")
         st.write("Services where the ACO deviates >20% from track average (threshold for highlighting).")
@@ -1369,7 +1554,7 @@ elif tab_selection == "Single ACO View":
         st.write("Individual quality measures with scores, track average, all-ACOs average, and % difference. Readmission/admission rates formatted as % (lower is better).")
         quality_measures = [
             {"Measure": "Hospital-wide 30-day Readmission Rate", "col": "Measure_479", "lower_better": True, "is_rate": True},
-            {"Measure": "All-cause Unplanned Admissions for Patients with Multiple Chronic Conditions", "col": "Measure_484", "lower_better": True, "is_rate": True},
+            {"Measure": "All-cause Unplanned Admissions for Patients with Multiple Chronic Conditions", "col": "Measure_484", "lower_better": True, "is_rate": False},
             {"Measure": "Falls: Screening for Future Fall Risk", "col": "QualityID_318", "lower_better": False, "is_rate": False},
             {"Measure": "Preventive Care & Screening: Influenza Immunization", "col": "QualityID_110", "lower_better": False, "is_rate": False},
             {"Measure": "Preventive Care & Screening: Tobacco Use Screening & Cessation Intervention", "col": "QualityID_226", "lower_better": False, "is_rate": False},
@@ -1502,14 +1687,14 @@ elif tab_selection == "Single ACO View":
 
 elif tab_selection == "Program Changes":
     st.subheader("MSSP Program Changes: PY 2022 to PY 2023")
-    
+   
     # High-level narrative
     st.markdown("""
     The Medicare Shared Savings Program (MSSP) for Performance Year (PY) 2023 incorporated several enhancements from the Calendar Year (CY) 2023 Physician Fee Schedule (PFS) Final Rule to promote program growth, equity, and participation—particularly for ACOs serving rural, underserved, or high-risk populations. These built on prior reforms (e.g., Pathways to Success) while addressing trends like plateaued ACO growth, underrepresentation of high-spending beneficiaries, and access disparities for minority groups.
-    
+   
     Key PY 2023 impacts included a shift to sliding-scale quality scoring (replacing all-or-nothing thresholds), expanded beneficiary assignment codes, and continued COVID-related flexibilities (e.g., EUC adjustments). These directly affect PUF-reported metrics like QualScore, EarnSaveLoss, Sav_rate, and assignment (N_AB). Overall, PY 2023 ACOs delivered record net savings to Medicare ($2.1B) and improved on many quality measures compared to PY 2022.
     """)
-    
+   
     # Bullet sections
     st.markdown("### Quality Program & Scoring")
     st.markdown("""
@@ -1517,31 +1702,31 @@ elif tab_selection == "Program Changes":
     - Extended incentives for eCQM/MIPS CQM reporting through PY 2024.
     - Maintained health equity adjustment eligibility for ACOs with ≥20% beneficiaries in affected counties or legal entity in such areas (all ACOs received DisAffQual=1 in PY 2023 due to ongoing PHE for COVID-19).
     """)
-    
+   
     st.markdown("### Beneficiary Assignment & Eligibility")
     st.markdown("""
     - Expanded primary care service codes eligible for prospective assignment (e.g., prolonged services, chronic pain management, certain behavioral health codes).
     - Updated facility IDs (e.g., FQHCs/RHCs) to account for mid-year changes in assignment methodology.
     """)
-    
+   
     st.markdown("### Financial & Benchmark Impacts (for PY 2023)")
     st.markdown("""
     - No major benchmark methodology overhaul in PY 2023 (major prospective trend/ACPT and other adjustments apply starting agreement periods from Jan 1, 2024).
     - Continued exclusion of certain IHS/Tribal/Puerto Rico supplement payments from FFS calculations but inclusion in revenue determinations.
     """)
-    
+   
     st.markdown("### Other Operational & Administrative")
     st.markdown("""
     - Reduced administrative burden: No pre-approval required for marketing materials; beneficiary notifications once per agreement period; simplified SNF 3-day rule waiver applications.
     - Data reporting: Continued use of CMS Web Interface (with phase-out planned later); CAHPS and claims-based measures unchanged for PY 2023.
     """)
-    
+   
     st.markdown("### Program Outcomes & Trends (PY 2023 vs PY 2022)")
     st.markdown("""
     - ACOs improved on required quality measures (e.g., diabetes/blood pressure control, cancer screenings, fall risk, statin therapy, depression screening/follow-up).
     - Record savings: Over Two Billion net to Medicare, with ACOs earning over Three Billion in shared savings payments.
     """)
-    
+   
     # Links section
     st.markdown("### Helpful Links to CMS Resources")
     st.markdown("""
@@ -1552,7 +1737,7 @@ elif tab_selection == "Program Changes":
     - [MSSP Program Overview & FAQs](https://www.cms.gov/medicare/payment/fee-for-service-providers/shared-savings-program-ssp-acos) — General resources and application info.
     - [PY 2023 Performance Results Press Release](https://www.cms.gov/newsroom/press-releases/medicare-shared-savings-program-continues-deliver-meaningful-savings-and-high-quality-health-care) — Outcomes and quality improvements.
     """)
-    
+   
     # Table (use st.table or markdown for simplicity)
     st.markdown("### Table: Key Technical/Data Changes in PY 2023 PUF (vs Prior Years)")
     changes_data = {
@@ -1579,6 +1764,5 @@ elif tab_selection == "Program Changes":
             "Data Dictionary + Final Rule"
         ]
     }
-    import pandas as pd
     df_changes = pd.DataFrame(changes_data)
     st.dataframe(df_changes, use_container_width=True, hide_index=True)
