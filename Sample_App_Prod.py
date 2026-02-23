@@ -1682,5 +1682,5 @@ elif tab_selection == "Single ACO View":
 elif tab_selection == "Program Changes":
     st.subheader("MSSP Program Changes: PY 2022 to PY 2023")
 
-    st.dataframe(df_changes, use_container_width=True, hide_index=True)
+
 
