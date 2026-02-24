@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import numpy as np
+from streamlit_option_menu import option_menu  # Added for clean sidebar menu
 
 # Detect current theme
 theme_type = st.context.theme.type if hasattr(st.context.theme, 'type') else "light"  # fallback
@@ -238,6 +239,7 @@ def load_data():
         "N_Ben_Race_White", "N_Ben_Race_Black", "N_Ben_Race_Asian", "N_Ben_Race_Hisp",
         "N_Ben_Race_Native", "N_Ben_Race_Other", "N_Ben_Race_Unknown"
     ])]
+
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -258,24 +260,20 @@ def load_data():
             "Aged Dual": pd.to_numeric(row.get("CMS_HCC_RiskScore_AGDU_PY"), errors='coerce'),
             "Aged Non-Dual": pd.to_numeric(row.get("CMS_HCC_RiskScore_AGND_PY"), errors='coerce')
         }
-
         person_years = {
             "ESRD": pd.to_numeric(row.get("N_AB_Year_ESRD_PY"), errors='coerce'),
             "Disabled": pd.to_numeric(row.get("N_AB_Year_DIS_PY"), errors='coerce'),
             "Aged Dual": pd.to_numeric(row.get("N_AB_Year_AGED_Dual_PY"), errors='coerce'),
             "Aged Non-Dual": pd.to_numeric(row.get("N_AB_Year_AGED_NonDual_PY"), errors='coerce')
         }
-
         valid_terms = []
         total_weight = 0.0
-
         for cat in risk_scores:
             risk = risk_scores[cat]
             py = person_years[cat]
             if pd.notna(risk) and pd.notna(py) and py > 0:
                 valid_terms.append(risk * py)
                 total_weight += py
-
         if total_weight > 0:
             return sum(valid_terms) / total_weight
         else:
@@ -291,24 +289,20 @@ def load_data():
             "Aged Dual": pd.to_numeric(row.get("CMS_HCC_RiskScore_AGDU_BY3"), errors='coerce'),
             "Aged Non-Dual": pd.to_numeric(row.get("CMS_HCC_RiskScore_AGND_BY3"), errors='coerce')
         }
-
         person_years = {
             "ESRD": pd.to_numeric(row.get("N_AB_Year_ESRD_BY3"), errors='coerce'),
             "Disabled": pd.to_numeric(row.get("N_AB_Year_DIS_BY3"), errors='coerce'),
             "Aged Dual": pd.to_numeric(row.get("N_AB_Year_AGED_Dual_BY3"), errors='coerce'),
             "Aged Non-Dual": pd.to_numeric(row.get("N_AB_Year_AGED_NonDual_BY3"), errors='coerce')
         }
-
         valid_terms = []
         total_weight = 0.0
-
         for cat in risk_scores:
             risk = risk_scores[cat]
             py = person_years[cat]
             if pd.notna(risk) and pd.notna(py) and py > 0:
                 valid_terms.append(risk * py)
                 total_weight += py
-
         if total_weight > 0:
             return sum(valid_terms) / total_weight
         else:
@@ -349,7 +343,7 @@ def fmt_date(x):
     except:
         return str(x)
 
-# ── Final robust fixed banner ────────────────────────────────────────────────
+# ── Page config & banner ─────────────────────────────────────────────────────
 st.set_page_config(page_title="MSSP 2023 Dashboard", layout="wide")
 
 # ── Fixed banner CSS ─────────────────────────────────────────────────────────
@@ -363,7 +357,7 @@ st.markdown(f"""
             right: 0 !important;
             width: 100% !important;
             height: 60px !important;
-            background: {'#f8f9fa' if theme_type != "dark" else '#0e1117'} !important;
+            background: {'#f8f9fa' if theme_type != "dark" else '#2C3C43'} !important;
             border-bottom: 1px solid {'#ddd' if theme_type != "dark" else '#333'} !important;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1) !important;
             z-index: 1000 !important;
@@ -372,7 +366,7 @@ st.markdown(f"""
             align-items: center !important;
             justify-content: flex-start !important;
         }}
-        
+       
         .fixed-banner .title {{
             font-size: 1.4rem !important;
             color: {PRIMARY} !important;
@@ -381,37 +375,39 @@ st.markdown(f"""
             flex: 1 !important;
             text-align: center !important;
         }}
-        
+       
         /* Push app content below banner */
         [data-testid="stAppViewContainer"] {{
             padding-top: 70px !important;
         }}
-        
-        /* Push sidebar below banner */
-        [data-testid="stSidebar"] {{
-            top: 70px !important;
-            position: absolute !important;
-            height: calc(100vh - 70px) !important;
-        }}
     </style>
 """, unsafe_allow_html=True)
 
-# Fixed banner markup
 st.markdown("""
     <div class="fixed-banner">
         <div class="title">Medicare Shared Savings Program – PY 2023 Dashboard</div>
     </div>
 """, unsafe_allow_html=True)
 
-tab_selection = st.sidebar.radio(
-    "Navigate",
-    ["Program Changes", "Overview", "Single ACO View"],
-    index=0,
-    key="main_navigation"
-)
+# ── Clean Navigation with streamlit-option-menu ──────────────────────────────
+with st.sidebar:
+    selected = option_menu(
+        menu_title="MSSP PY 2023 Dashboard",
+        options=["Program Changes", "Overview", "Single ACO View"],
+        icons=["file-earmark-text", "bar-chart-line-fill", "search"],  # Bootstrap-style icons
+        menu_icon="cast",
+        default_index=1,  # Start on Overview
+        orientation="vertical",
+        styles={
+            "container": {"padding": "5px", "background-color": "transparent"},
+            "icon": {"color": PRIMARY, "font-size": "20px"},
+            "nav-link": {"font-size": "16px", "text-align": "left", "margin": "0px", "--hover-color": "#eee"},
+            "nav-link-selected": {"background-color": PRIMARY, "color": "white"},
+        }
+    )
 
-# Main content area – switch based on selection
-if tab_selection == "Overview":
+# ── Page Content ──────────────────────────────────────────────────────────────
+if selected == "Overview":
     st.subheader("Program-Wide Totals")
     cols = st.columns(6)
     cols[0].metric("Total ACOs", f"{len(df):,}")
@@ -443,7 +439,6 @@ if tab_selection == "Overview":
         ).values,
         errors="coerce"
     )
-    # Always calculate per-unit columns (even if not displayed in "Totals" mode)
     agg["Per_Ben_Benchmark"] = agg["Benchmark"] / agg["Assigned Beneficiaries"]
     agg["Per_Ben_Expenditures"] = agg["Expenditures"] / agg["Assigned Beneficiaries"]
     agg["Per_Ben_Raw_Savings"] = agg["Raw_Savings"] / agg["Assigned Beneficiaries"]
@@ -452,7 +447,6 @@ if tab_selection == "Overview":
     agg["PMPM_Expenditures"] = agg["Per_Ben_Expenditures"] / 12
     agg["PMPM_Raw_Savings"] = agg["Per_Ben_Raw_Savings"] / 12
     agg["PMPM_Earned"] = agg["Per_Ben_Earned"] / 12
-    # Choose columns based on view_mode, but always include the core ones
     core_cols = ["Current_Track", "ACO_Count", "Assigned Beneficiaries"]
     if view_mode == "Per Beneficiary":
         disp_cols = core_cols + ["Per_Ben_Benchmark", "Per_Ben_Expenditures", "Per_Ben_Raw_Savings", "Per_Ben_Earned", "Weighted_Savings_Rate"]
@@ -461,7 +455,6 @@ if tab_selection == "Overview":
     else:
         disp_cols = core_cols + ["Benchmark", "Expenditures", "Raw_Savings", "Earned", "Weighted_Savings_Rate"]
     disp = agg[disp_cols].copy()
-    # Formatting loop – now handles the new per-unit columns
     for col in disp.columns:
         if col == "Current_Track":
             continue
@@ -475,7 +468,6 @@ if tab_selection == "Overview":
             disp[col] = disp[col].apply(lambda x: fmt_dollars(x, decimals=0))
         elif any(k in col for k in ["Benchmark", "Expenditures", "Raw_Savings", "Earned"]):
             disp[col] = disp[col].apply(lambda x: fmt_dollars(x, decimals=0))
-    # Rename for display clarity (add per-unit labels)
     rename_dict = {
         "Per_Ben_Benchmark": "Benchmark (Per Beneficiary)",
         "Per_Ben_Expenditures": "Expenditures (Per Beneficiary)",
@@ -502,8 +494,7 @@ if tab_selection == "Overview":
         fig2.update_layout(template=PLOTLY_TEMPLATE, yaxis_tickformat="$,.0f")
         st.plotly_chart(fig2, use_container_width=True)
     colP1, colP2 = st.columns(2)
-    # Define pie colors based on current theme (reuses your variables)
-    pie_colors = [PRIMARY, ACCENT, NEUTRAL, "#636EFA", "#EF553B"] # fallback + theme colors
+    pie_colors = [PRIMARY, ACCENT, NEUTRAL, "#636EFA", "#EF553B"]
     with colP1:
         fig_aco_pie = px.pie(
             agg,
@@ -511,7 +502,7 @@ if tab_selection == "Overview":
             names="Current_Track",
             title="ACOs by Track",
             hole=0.4,
-            color_discrete_sequence=pie_colors # ← custom colors
+            color_discrete_sequence=pie_colors
         )
         fig_aco_pie.update_layout(
             template=PLOTLY_TEMPLATE,
@@ -526,7 +517,7 @@ if tab_selection == "Overview":
             names="Current_Track",
             title="Beneficiaries by Track",
             hole=0.4,
-            color_discrete_sequence=pie_colors # ← same custom colors
+            color_discrete_sequence=pie_colors
         )
         fig_benef_pie.update_layout(
             template=PLOTLY_TEMPLATE,
@@ -534,10 +525,8 @@ if tab_selection == "Overview":
             legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
         )
         st.plotly_chart(fig_benef_pie, use_container_width=True)
-    # ── Moved from Charts tab: Quality & Performance Visuals ──────────────────
     st.markdown("---")
     st.subheader("Quality & Performance Visuals (PY 2023)")
-    # 1. Quality Score vs Earned Savings Scatter
     st.markdown("### 1. Quality Score vs Earned Shared Savings/Losses")
     track_options = ["All"] + sorted(df["Current_Track"].dropna().unique())
     selected_track = st.selectbox("Filter by Track (Scatter)", track_options, index=0, key="track_scatter_overview")
@@ -583,7 +572,6 @@ if tab_selection == "Overview":
         fig_earned.update_traces(marker=dict(opacity=0.75, line=dict(width=0.5)))
         fig_earned.update_layout(template=PLOTLY_TEMPLATE, yaxis_tickformat="$,.0f", height=600)
         st.plotly_chart(fig_earned, use_container_width=True)
-    # 2. Box Plot: Quality Score by Track
     st.markdown("### 2. Quality Score Distribution by Track")
     track_order = ["A", "B", "C", "D", "E", "EN"]
     fig_box = px.box(
@@ -603,7 +591,6 @@ if tab_selection == "Overview":
         xaxis={'categoryorder':'array', 'categoryarray': track_order}
     )
     st.plotly_chart(fig_box, use_container_width=True)
-    # 3. CAHPS Domain Averages by Track
     st.markdown("### 3. CAHPS Domain Averages by Track")
     cahps_domains = {
         "Getting Timely Care": ["CAHPS_1", "CAHPS_2"],
@@ -650,24 +637,20 @@ if tab_selection == "Overview":
     else:
         st.info("CAHPS measures not available or all suppressed.")
 
-elif tab_selection == "Single ACO View":
+elif selected == "Single ACO View":
     st.subheader("Single ACO View")
-    # ACO selector
     aco_options = sorted(df["ACO_Name"].unique())
     selected_aco = st.selectbox("Select ACO", aco_options, index=0)
     aco_data = df[df["ACO_Name"] == selected_aco].iloc[0]
     if aco_data.empty:
         st.error("No data found for selected ACO.")
     else:
-        # Force beneficiary and demographic columns to numeric
         beneficiary_cols = [col for col in df.columns if any(k in col for k in ["N_AB", "N_Ben_", "N_AB_Year_", "N_Ben_VA_Only", "N_Ben_CBA_Only", "N_Ben_CBA_and_VA"])]
         for col in beneficiary_cols:
             if col in aco_data:
                 aco_data[col] = pd.to_numeric(aco_data[col], errors="coerce")
-        # Calculate track average early
         track = aco_data["Current_Track"]
         track_avg = df[df["Current_Track"] == track].mean(numeric_only=True)
-        # 1. Header & Configuration
         st.markdown(f"### {aco_data['ACO_Name']} ({aco_data['ACO_ID']})")
         cols_row1 = st.columns(5)
         cols_row1[0].metric("Track", aco_data["Current_Track"])
@@ -679,7 +662,6 @@ elif tab_selection == "Single ACO View":
         cols_row2[0].metric("Assigned Beneficiaries", fmt_comma(aco_data["N_AB"]))
         cols_row2[1].metric("Quality Score", fmt_pct(aco_data["QualScore"]))
         cols_row2[2].metric("Earned Shared Savings/Loss", fmt_dollars(aco_data["EarnSaveLoss"]))
-        # Facility Makeup
         st.markdown("### ACO Facility Makeup")
         st.write("Number of participating facilities by type (based on certified participant list and PECOS data).")
         facility_data = [
@@ -692,7 +674,6 @@ elif tab_selection == "Single ACO View":
         ]
         df_facility = pd.DataFrame(facility_data)
         st.dataframe(df_facility, use_container_width=True, hide_index=True)
-        # Participating Provider Types
         st.markdown("### Participating Provider Types")
         st.write("Number of participating clinicians by type (reassigned billing rights to ACO participant).")
         provider_data = [
@@ -704,9 +685,7 @@ elif tab_selection == "Single ACO View":
         ]
         df_provider = pd.DataFrame(provider_data)
         st.dataframe(df_provider, use_container_width=True, hide_index=True)
-        # 2. Demographics Profile – smaller pies in rows
         st.markdown("### Demographics Profile")
-        # Row 1: 3 pies
         pie_row1 = st.columns(3)
         with pie_row1[0]:
             enrollment_cols = {
@@ -780,7 +759,6 @@ elif tab_selection == "Single ACO View":
                 st.plotly_chart(fig_sex, use_container_width=True)
             else:
                 st.info("No sex data.")
-        # Row 2: 2 pies (age + race)
         pie_row2 = st.columns(2)
         with pie_row2[0]:
             age_cols = {
@@ -835,7 +813,6 @@ elif tab_selection == "Single ACO View":
                 st.plotly_chart(fig_race, use_container_width=True)
             else:
                 st.info("No race data.")
-        # Risk Adjustment section
         st.markdown("### Risk Adjustment")
         risk_cols = {
             "ESRD": ["CMS_HCC_RiskScore_ESRD_BY1", "CMS_HCC_RiskScore_ESRD_BY2", "CMS_HCC_RiskScore_ESRD_BY3", "CMS_HCC_RiskScore_ESRD_PY"],
@@ -851,16 +828,13 @@ elif tab_selection == "Single ACO View":
             risk_df[period] = [aco_data[risk_cols[cat][i]] if risk_cols[cat][i] in df.columns else np.nan for cat in risk_cols]
         risk_df["Track Avg (PY)"] = [track_avg.get(risk_cols[cat][3], np.nan) for cat in risk_cols]
         st.dataframe(risk_df, use_container_width=True, hide_index=True)
-        # Use pre-calculated weighted risk scores from df
         weighted_risk_py = aco_data.get("weighted_risk_py", np.nan)
         if pd.notna(weighted_risk_py):
             st.metric("Overall Weighted Risk Score (PY)", f"{weighted_risk_py:.3f}")
         else:
             st.metric("Overall Weighted Risk Score (PY)", "N/A")
-        # 5. Financial & Performance Roll-Up (preserved)
         st.markdown("### Financial & Performance Roll-Up")
         with st.expander("Expand to see detailed calculation path", expanded=False):
-            # Summary level table (visible inside expander)
             summary_data = {
                 "Metric": [
                     "Total Benchmark",
@@ -900,7 +874,6 @@ elif tab_selection == "Single ACO View":
             }
             summary_df = pd.DataFrame(summary_data)
             st.dataframe(summary_df, use_container_width=True, hide_index=True)
-            # Export button
             csv = aco_data.to_csv(index=True).encode('utf-8')
             st.download_button(
                 label="Export Full ACO Data (CSV)",
@@ -908,8 +881,6 @@ elif tab_selection == "Single ACO View":
                 file_name=f"{aco_data['ACO_Name']}_2023.csv",
                 mime="text/csv"
             )
-
-            # ── PPTX Export Button ───────────────────────────────────────────────
             if st.button("Export Full Report (PPTX)"):
                 pptx_bytes = generate_pptx_report(aco_data, df, track_avg)
                 st.download_button(
@@ -919,8 +890,6 @@ elif tab_selection == "Single ACO View":
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     key=f"pptx_{aco_data.get('ACO_ID')}"
                 )
-
-            # Nested expanders for details
             with st.expander("Total Benchmark Components"):
                 st.write("**Calculation**: Historical Benchmark + Regional/Trend Adjustment = Final Benchmark")
                 st.write(f"- Historical Benchmark: {fmt_dollars(aco_data.get('HistBnchmk', np.nan))}")
@@ -941,26 +910,20 @@ elif tab_selection == "Single ACO View":
                 }
                 existing_cols = {k: v for k, v in capann_cols.items() if v in df.columns}
                 if existing_cols:
-                    # Calculate component aggregates using person-years
                     exp_df = pd.DataFrame({
                         "Category": list(existing_cols.keys()),
                         "Aggregate ($)": [fmt_dollars(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] if pd.notna(aco_data.get(v)) else np.nan) for v in existing_cols.values()],
                         "Per Beneficiary": [fmt_dollars(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] / aco_data["N_AB"] if pd.notna(aco_data.get(v)) and aco_data["N_AB"] > 0 else 0) for v in existing_cols.values()],
                         "PMPM": [fmt_dollars(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] / aco_data["N_AB"] / 12 if pd.notna(aco_data.get(v)) and aco_data["N_AB"] > 0 else 0, 2) for v in existing_cols.values()]
                     })
-                    # Sum of components (aggregate)
                     component_sum_agg = sum(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] for v in existing_cols.values() if pd.notna(aco_data.get(v)))
-                    # Truncation adjustment (aggregate)
                     total_exp = aco_data["ABtotExp"] if pd.notna(aco_data["ABtotExp"]) else 0
                     truncation_adj_agg = total_exp - component_sum_agg
-                    # Subtotal and adjustment rows
                     exp_df.loc[len(exp_df)] = ["Subtotal (Components)", fmt_dollars(component_sum_agg), fmt_dollars(component_sum_agg / aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0), fmt_dollars(component_sum_agg / aco_data["N_AB"] / 12 if aco_data["N_AB"] > 0 else 0, 2)]
                     exp_df.loc[len(exp_df)] = ["Truncation Adjustment", fmt_dollars(truncation_adj_agg), fmt_dollars(truncation_adj_agg / aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0), fmt_dollars(truncation_adj_agg / aco_data["N_AB"] / 12 if aco_data["N_AB"] > 0 else 0, 2)]
                     exp_df.loc[len(exp_df)] = ["Total Expenditures", fmt_dollars(total_exp), fmt_dollars(total_exp / aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0), fmt_dollars(total_exp / aco_data["N_AB"] / 12 if aco_data["N_AB"] > 0 else 0, 2)]
                     st.dataframe(exp_df, use_container_width=True, hide_index=True)
-                    # Note on truncation
                     st.info("**Note**: Small discrepancies between total and component sum are due to CMS truncation/rounding of per capita values to whole dollars. Adjustment row reconciles to official total (ABtotExp). Per Beneficiary uses total assigned beneficiaries (N_AB).")
-                    # Nested expander for Inpatient (Total)
                     with st.expander("Inpatient (Total) Breakdown"):
                         inpatient_cols = {
                             "Short-Term": "CapAnn_INP_S_trm",
@@ -976,12 +939,9 @@ elif tab_selection == "Single ACO View":
                                 "Per Beneficiary": [fmt_dollars(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] / aco_data["N_AB"] if pd.notna(aco_data.get(v)) and aco_data["N_AB"] > 0 else 0) for v in existing_inpatient.values()],
                                 "PMPM": [fmt_dollars(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] / aco_data["N_AB"] / 12 if pd.notna(aco_data.get(v)) and aco_data["N_AB"] > 0 else 0, 2) for v in existing_inpatient.values()]
                             })
-                            # Sum of inpatient components (aggregate)
                             component_sum_agg = sum(aco_data.get(v, 0) * aco_data["N_AB_Year_PY"] for v in existing_inpatient.values() if pd.notna(aco_data.get(v)))
-                            # Truncation adjustment (aggregate)
                             inp_total = aco_data["CapAnn_INP_All"] * aco_data["N_AB_Year_PY"] if pd.notna(aco_data["CapAnn_INP_All"]) else 0
                             truncation_adj_agg = inp_total - component_sum_agg
-                            # Subtotal and adjustment rows
                             inp_df.loc[len(inp_df)] = ["Subtotal (Components)", fmt_dollars(component_sum_agg), fmt_dollars(component_sum_agg / aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0), fmt_dollars(component_sum_agg / aco_data["N_AB"] / 12 if aco_data["N_AB"] > 0 else 0, 2)]
                             inp_df.loc[len(inp_df)] = ["Truncation Adjustment", fmt_dollars(truncation_adj_agg), fmt_dollars(truncation_adj_agg / aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0), fmt_dollars(truncation_adj_agg / aco_data["N_AB"] / 12 if aco_data["N_AB"] > 0 else 0, 2)]
                             inp_df.loc[len(inp_df)] = ["Total Inpatient", fmt_dollars(inp_total), fmt_dollars(inp_total / aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0), fmt_dollars(inp_total / aco_data["N_AB"] / 12 if aco_data["N_AB"] > 0 else 0, 2)]
@@ -1009,7 +969,6 @@ elif tab_selection == "Single ACO View":
                 st.write(f"- Mid-Year Termination Proration: {'Yes (prorated)' if aco_data['Impact_Mid_Year_Termination'] == 1 else 'No'}")
                 st.write(f"- Sequestration / Payment Limit: 2% federal reduction applied per policy (not ACO-specific in PUF)")
                 st.write(f"- Final Earned Shared Savings/Loss: {fmt_dollars(aco_data['EarnSaveLoss'])}")
-        # 5. Utilization Breakdown Chart with Physician/Supplier added + % of Total Spend pie
         st.markdown("### Utilization Breakdown")
         capann_cols = {
             "Inpatient (Total)": "CapAnn_INP_All",
@@ -1022,7 +981,6 @@ elif tab_selection == "Single ACO View":
         }
         existing_cols = {k: v for k, v in capann_cols.items() if v in df.columns}
         if existing_cols:
-            # Existing per capita bar chart
             util_melt = pd.DataFrame({
                 "Category": list(existing_cols.keys()),
                 "This ACO": [aco_data.get(v, 0) for v in existing_cols.values()],
@@ -1039,7 +997,6 @@ elif tab_selection == "Single ACO View":
                 category_orders={"Category": list(capann_cols.keys())}
             )
             fig_util.update_layout(template=PLOTLY_TEMPLATE, xaxis_tickangle=-45)
-            # New: % of Total Spend pie (using This ACO values)
             total_util = sum(aco_data.get(v, 0) for v in existing_cols.values() if pd.notna(aco_data.get(v)))
             if total_util > 0:
                 percent_df = pd.DataFrame({
@@ -1055,7 +1012,6 @@ elif tab_selection == "Single ACO View":
                 )
                 fig_percent.update_traces(textposition='inside', textinfo='percent+label')
                 fig_percent.update_layout(template=PLOTLY_TEMPLATE, height=400)
-                # Side-by-side layout
                 col_left, col_right = st.columns(2)
                 with col_left:
                     st.plotly_chart(fig_util, use_container_width=True)
@@ -1066,7 +1022,6 @@ elif tab_selection == "Single ACO View":
                 st.info("Total utilization is zero or NaN – % pie not shown.")
         else:
             st.info("No utilization expenditure columns available for this ACO.")
-        # Inpatient Derived Metrics Table
         st.markdown("### Inpatient Utilization Metrics")
         st.write("Derived metrics for inpatient discharges by type (per 1,000 person-years unless noted).")
         inpatient_types = [
@@ -1102,11 +1057,9 @@ elif tab_selection == "Single ACO View":
             st.dataframe(df_inpatient, use_container_width=True, hide_index=True)
         else:
             st.info("No inpatient discharge columns found in data. Check CSV for ADM, ADM_S_Trm, CapAnn_INP_All, etc.")
-        # SNF Utilization Metrics
         st.markdown("### SNF Utilization Metrics")
         st.write("Skilled Nursing Facility metrics vs average across all ACOs.")
         snf_table = []
-        # 1. SNF Admissions per 1,000 Person-Years
         if "P_SNF_ADM" in df.columns:
             this_aco_adm = aco_data.get("P_SNF_ADM", np.nan)
             all_aco_avg_adm = df["P_SNF_ADM"].mean(skipna=True)
@@ -1119,7 +1072,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": f"{all_aco_avg_adm:.1f}" if pd.notna(all_aco_avg_adm) else "N/A",
                 "% Difference": deviation_adm
             })
-        # 2. Aggregate SNF Admissions
         if "P_SNF_ADM" in df.columns:
             aggregate_adm_this = this_aco_adm * (aco_data.get("N_AB_Year_PY", 0) / 1000) if aco_data.get("N_AB_Year_PY", 0) > 0 else 0
             aggregate_adm_avg = all_aco_avg_adm * (df["N_AB_Year_PY"].mean(skipna=True) / 1000) if pd.notna(all_aco_avg_adm) else np.nan
@@ -1131,7 +1083,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": f"{aggregate_adm_avg:,.0f}" if pd.notna(aggregate_adm_avg) else "N/A",
                 "% Difference": deviation_agg_adm
             })
-        # 3. Total SNF Expenditures
         if "CapAnn_SNF" in df.columns:
             total_exp_this = aco_data.get("CapAnn_SNF", 0) * aco_data.get("N_AB_Year_PY", 0)
             total_exp_avg = df["CapAnn_SNF"].mean(skipna=True) * df["N_AB_Year_PY"].mean(skipna=True)
@@ -1143,7 +1094,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": fmt_dollars(total_exp_avg, 0) if pd.notna(total_exp_avg) else "N/A",
                 "% Difference": deviation_exp
             })
-        # 4. Average SNF LOS (days)
         if "SNF_LOS" in df.columns:
             los_this = aco_data.get("SNF_LOS", np.nan)
             los_avg = df["SNF_LOS"].mean(skipna=True)
@@ -1155,7 +1105,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": f"{los_avg:.1f}" if pd.notna(los_avg) else "N/A",
                 "% Difference": deviation_los
             })
-        # 5. Cost per SNF Day
         if "CapAnn_SNF" in df.columns and "SNF_LOS" in df.columns:
             snf_days_this = (aco_data.get("SNF_LOS", 0) * aggregate_adm_this) if 'aggregate_adm_this' in locals() else 0
             cost_per_day_this = total_exp_this / snf_days_this if snf_days_this > 0 else 0
@@ -1169,7 +1118,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": fmt_dollars(cost_per_day_avg, 0) if pd.notna(cost_per_day_avg) else "N/A",
                 "% Difference": deviation_day
             })
-        # 6. Cost per SNF Admission
         if 'total_exp_this' in locals() and 'aggregate_adm_this' in locals():
             cost_per_adm_this = total_exp_this / aggregate_adm_this if aggregate_adm_this > 0 else 0
             cost_per_adm_avg = total_exp_avg / aggregate_adm_avg if aggregate_adm_avg > 0 else 0
@@ -1181,7 +1129,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": fmt_dollars(cost_per_adm_avg, 2) if pd.notna(cost_per_adm_avg) else "N/A",
                 "% Difference": deviation_adm_cost
             })
-        # 7. SNF Cost per Beneficiary & PMPM
         if 'total_exp_this' in locals():
             cost_per_benef_this = total_exp_this / aco_data.get("N_AB", 1) if aco_data.get("N_AB", 1) > 0 else 0
             pmpm_this = cost_per_benef_this / 12
@@ -1206,11 +1153,9 @@ elif tab_selection == "Single ACO View":
             st.dataframe(df_snf, use_container_width=True, hide_index=True)
         else:
             st.info("No SNF columns found (P_SNF_ADM, CapAnn_SNF, SNF_LOS missing).")
-        # Emergency Department (ED) Utilization Comparison
         st.markdown("### Emergency Department (ED) Utilization")
         st.write("ED visits per 1,000 person-years and % leading to hospitalization vs average across all ACOs. Deviations >20% highlighted.")
         ed_data = []
-        # ED Visits per 1,000 person-years
         if "P_EDV_Vis" in df.columns:
             this_aco_ed_vis = aco_data.get("P_EDV_Vis", np.nan)
             all_aco_avg_ed_vis = df["P_EDV_Vis"].mean() if "P_EDV_Vis" in df.columns else np.nan
@@ -1224,7 +1169,6 @@ elif tab_selection == "Single ACO View":
                 "% Difference": deviation_vis,
                 "Alert": alert_vis
             })
-        # % of ED Visits Leading to Hospitalization
         if "P_EDV_Vis_HOSP" in df.columns:
             this_aco_ed_vis = aco_data.get("P_EDV_Vis_HOSP", np.nan)
             all_aco_avg_ed_vis = df["P_EDV_Vis_HOSP"].mean() if "P_EDV_Vis_HOSP" in df.columns else np.nan
@@ -1240,7 +1184,6 @@ elif tab_selection == "Single ACO View":
             })
         if ed_data:
             df_ed = pd.DataFrame(ed_data)
-            # Highlight alerts
             def highlight_alert(row):
                 if row["Alert"] == "High":
                     return ['background-color: #ffcccc'] * len(row)
@@ -1254,7 +1197,6 @@ elif tab_selection == "Single ACO View":
             )
         else:
             st.info("ED columns (P_EDV_Vis and/or P_EDV_Vis_Hosp) not found in data.")
-        # Primary Care Services View
         st.markdown("### Primary Care Services")
         st.write("E&M visits per 1,000 person-years by provider type vs average across all ACOs.")
         pcp_metrics = [
@@ -1269,13 +1211,11 @@ elif tab_selection == "Single ACO View":
             col = m["col"]
             if col not in df.columns:
                 continue
-            # Force numeric (handles suppression like *, -, empty)
             df_numeric = pd.to_numeric(df[col], errors='coerce')
             this_aco_val = pd.to_numeric(aco_data.get(col, np.nan), errors='coerce')
             all_aco_avg = df_numeric.mean(skipna=True)
             pct_diff = (this_aco_val - all_aco_avg) / all_aco_avg if pd.notna(all_aco_avg) and all_aco_avg != 0 else np.nan
             deviation_str = f"{pct_diff*100:.1f}%" if pd.notna(pct_diff) else "N/A"
-            # Format with commas for thousands
             this_aco_fmt = f"{this_aco_val:,.1f}" if pd.notna(this_aco_val) else "N/A"
             all_aco_fmt = f"{all_aco_avg:,.1f}" if pd.notna(all_aco_avg) else "N/A"
             pcp_table.append({
@@ -1289,7 +1229,6 @@ elif tab_selection == "Single ACO View":
             st.dataframe(df_pcp, use_container_width=True, hide_index=True)
         else:
             st.info("No primary care columns found (P_EM_Total, P_EM_PCP_Vis, etc. missing).")
-        # PCP Services vs Raw Savings Scatter Plot with Callout (ACO Name)
         st.markdown("### PCP Services vs Raw Savings")
         st.write("Scatter plot across all ACOs: PCP E&M visits per 1,000 person-years vs raw savings. Bubble size = Assigned Beneficiaries; color = Quality Score (green = high, red = low). Selected ACO highlighted with callout.")
         if all(col in df.columns for col in ["P_EM_PCP_Vis", "BnchmkMinExp", "QualScore", "N_AB", "ACO_Name", "ACO_ID"]):
@@ -1301,7 +1240,7 @@ elif tab_selection == "Single ACO View":
                 y="BnchmkMinExp",
                 size="N_AB",
                 color="QualScore",
-                color_continuous_scale="RdYlGn", # Red (low) → Yellow → Green (high)
+                color_continuous_scale="RdYlGn",
                 trendline="ols",
                 trendline_scope="overall",
                 trendline_color_override="#A5D8FF",
@@ -1319,7 +1258,6 @@ elif tab_selection == "Single ACO View":
                     "BnchmkMinExp": "Raw Savings ($)"
                 }
             )
-            # Add callout annotation with actual ACO name
             selected_row = plot_df[plot_df["ACO_ID"] == aco_data["ACO_ID"]]
             if not selected_row.empty:
                 x_val = selected_row["P_EM_PCP_Vis"].iloc[0]
@@ -1331,8 +1269,8 @@ elif tab_selection == "Single ACO View":
                     text=f"<b>{aco_name}</b>",
                     showarrow=True,
                     arrowhead=2,
-                    ax=60, # Arrow x-offset — adjust if needed
-                    ay=-60, # Arrow y-offset — adjust if needed
+                    ax=60,
+                    ay=-60,
                     font=dict(size=14, color="#000000"),
                     bgcolor="#FFFFFF",
                     bordercolor="#000000",
@@ -1345,21 +1283,18 @@ elif tab_selection == "Single ACO View":
             st.plotly_chart(fig_scat, use_container_width=True)
         else:
             st.info("Missing columns for scatter plot (P_EM_PCP_Vis, BnchmkMinExp, QualScore, N_AB, ACO_ID).")
-        # PCP Services vs Raw Savings Per Beneficiary Scatter Plot (Fallback Size)
         st.markdown("### PCP Services vs Raw Savings Per Beneficiary")
         st.write("Scatter plot across all ACOs: PCP E&M visits per 1,000 person-years vs raw savings per beneficiary. Selected ACO bubble larger (scaled by risk score). Trend line added.")
         if all(col in df.columns for col in ["P_EM_PCP_Vis", "BnchmkMinExp", "N_AB_Year_PY", "ACO_Name", "ACO_ID"]):
             plot_df = df.copy()
             plot_df = plot_df[plot_df["P_EM_PCP_Vis"].notna() & plot_df["BnchmkMinExp"].notna() & plot_df["N_AB_Year_PY"].notna() & (plot_df["N_AB_Year_PY"] > 0)]
-            # Calculate raw savings per beneficiary
             plot_df["Raw_Savings_Per_Benef"] = plot_df["BnchmkMinExp"] / plot_df["N_AB_Year_PY"]
-            # Create list for bubble size: every ACO gets its own risk score scaled
             size = [np.nan_to_num(row["weighted_risk_py"], nan=0.1) * 100 for _, row in plot_df.iterrows()]
             fig_scat_per = px.scatter(
                 plot_df,
                 x="P_EM_PCP_Vis",
                 y="Raw_Savings_Per_Benef",
-                size=size, # Now uses the safe list
+                size=size,
                 trendline="ols",
                 trendline_scope="overall",
                 trendline_color_override="#A5D8FF",
@@ -1377,7 +1312,6 @@ elif tab_selection == "Single ACO View":
                     "Raw_Savings_Per_Benef": "Raw Savings Per Beneficiary ($)"
                 }
             )
-            # Add callout annotation with actual ACO name
             selected_row = plot_df[plot_df["ACO_ID"] == aco_data["ACO_ID"]]
             if not selected_row.empty:
                 x_val = selected_row["P_EM_PCP_Vis"].iloc[0]
@@ -1403,34 +1337,28 @@ elif tab_selection == "Single ACO View":
             st.plotly_chart(fig_scat_per, use_container_width=True)
         else:
             st.info("Missing columns for per-beneficiary scatter plot (P_EM_PCP_Vis, BnchmkMinExp, N_AB_Year_PY, ACO_ID).")
-        # 6. Utilization Comparison – FIXED ORDER VERSION
         st.markdown("### Utilization Comparison")
         st.write("Bar chart of per capita cost across all ACOs (ascending order: lowest/left = most efficient → highest/right = least efficient). Selected ACO highlighted in theme color.")
         for cat, cost_col in capann_cols.items():
             if cost_col not in df.columns:
                 continue
-            # Copy and prepare
             all_df = df.copy()
             all_df[cost_col] = pd.to_numeric(all_df[cost_col], errors='coerce')
-            # Sort ascending (lowest cost first = left)
             all_df = all_df.sort_values(cost_col, ascending=True, na_position='last').reset_index(drop=True)
-            # Highlight/color AFTER sort
             all_df["Highlight"] = all_df["ACO_ID"] == aco_data["ACO_ID"]
-            all_df["Color"] = all_df["Highlight"].map({True: PRIMARY, False: NEUTRAL}) # ← use PRIMARY for highlight, NEUTRAL for others
-            # Add index as x (forces correct sorted order)
+            all_df["Color"] = all_df["Highlight"].map({True: PRIMARY, False: NEUTRAL})
             all_df["Index"] = all_df.index
             fig_bar = px.bar(
                 all_df,
-                x="Index", # Use numeric index instead of name
+                x="Index",
                 y=cost_col,
                 color="Color",
-                color_discrete_map={PRIMARY: PRIMARY, NEUTRAL: NEUTRAL}, # ← map to theme colors
+                color_discrete_map={PRIMARY: PRIMARY, NEUTRAL: NEUTRAL},
                 title=f"{cat} – Per Capita Cost Across All ACOs (Selected ACO in Theme Color)",
                 labels={cost_col: "Per Capita Cost ($)"},
                 hover_data=["ACO_Name", cost_col]
             )
-            # Custom x-axis: only show selected ACO name at its position
-            ticktext = ["" for _ in all_df.index] # blank everywhere
+            ticktext = ["" for _ in all_df.index]
             if all_df["Highlight"].any():
                 selected_idx = all_df[all_df["Highlight"]].index[0]
                 ticktext[selected_idx] = aco_data["ACO_Name"]
@@ -1438,23 +1366,20 @@ elif tab_selection == "Single ACO View":
                 template=PLOTLY_TEMPLATE,
                 xaxis={
                     'tickmode': 'array',
-                    'tickvals': list(range(len(all_df))), # 0,1,2,... positions
+                    'tickvals': list(range(len(all_df))),
                     'ticktext': ticktext,
                 },
                 xaxis_tickangle=-45,
                 showlegend=False,
                 height=500
             )
-            # Fixed hover: ACO name + formatted cost
             fig_bar.update_traces(hovertemplate="%{customdata[0]}<br>Per Capita Cost: $%{y:,.0f}")
             st.plotly_chart(fig_bar, use_container_width=True)
-        # New: 4. Outlier Detection in Admissions/LOS
         st.markdown("### Outlier Detection in Admissions & LOS")
         st.write("Services where the ACO deviates >20% from track average (threshold for highlighting).")
         outlier_data = []
-        outlier_threshold = 0.20 # 20% deviation
+        outlier_threshold = 0.20
         st.caption(f"**Threshold**: >{outlier_threshold*100}% deviation from track average (absolute value).")
-        # Inpatient Admissions per 1,000
         if all(col in aco_data for col in ["ADM_INP_All", "N_AB"]) and aco_data["N_AB"] > 0:
             adm_per_1000 = aco_data["ADM_INP_All"] / aco_data["N_AB"] * 1000
             track_adm_per_1000 = track_avg["ADM_INP_All"] / track_avg["N_AB"] * 1000 if track_avg["N_AB"] > 0 else np.nan
@@ -1467,7 +1392,6 @@ elif tab_selection == "Single ACO View":
                     "% Deviation": f"{pct_diff*100:.1f}%",
                     "Alert": "High" if pct_diff > 0 else "Low"
                 })
-        # Outpatient Visits per 1,000
         if all(col in aco_data for col in ["ADM_OPD", "N_AB"]) and aco_data["N_AB"] > 0:
             adm_per_1000 = aco_data["ADM_OPD"] / aco_data["N_AB"] * 1000
             track_adm_per_1000 = track_avg["ADM_OPD"] / track_avg["N_AB"] * 1000 if track_avg["N_AB"] > 0 else np.nan
@@ -1480,7 +1404,6 @@ elif tab_selection == "Single ACO View":
                     "% Deviation": f"{pct_diff*100:.1f}%",
                     "Alert": "High" if pct_diff > 0 else "Low"
                 })
-        # Physician/Supplier Visits per 1,000
         if all(col in aco_data for col in ["ADM_PB", "N_AB"]) and aco_data["N_AB"] > 0:
             adm_per_1000 = aco_data["ADM_PB"] / aco_data["N_AB"] * 1000
             track_adm_per_1000 = track_avg["ADM_PB"] / track_avg["N_AB"] * 1000 if track_avg["N_AB"] > 0 else np.nan
@@ -1493,7 +1416,6 @@ elif tab_selection == "Single ACO View":
                     "% Deviation": f"{pct_diff*100:.1f}%",
                     "Alert": "High" if pct_diff > 0 else "Low"
                 })
-        # SNF LOS
         if "SNF_LOS" in aco_data and pd.notna(aco_data["SNF_LOS"]):
             snf_los = aco_data["SNF_LOS"]
             track_snf_los = track_avg["SNF_LOS"] if pd.notna(track_avg["SNF_LOS"]) else np.nan
@@ -1511,7 +1433,6 @@ elif tab_selection == "Single ACO View":
             st.dataframe(outlier_df, use_container_width=True, hide_index=True)
         else:
             st.success("No significant outliers detected (>20% deviation from track average).")
-        # New: 6. Savings Attribution to Utilization Reduction
         st.markdown("### Savings Attribution to Utilization Reduction")
         st.write("Estimated contribution of lower utilization to savings (compared to track average). Calculation: (Track Avg Per Capita - ACO Per Capita) × N_AB. Positive = contributed to savings; negative = increased costs.")
         attribution_data = []
@@ -1532,7 +1453,6 @@ elif tab_selection == "Single ACO View":
             st.caption("**Calculation Note**: Contribution = (Track Avg Per Capita - ACO Per Capita) × Assigned Beneficiaries (N_AB). Assumes utilization delta directly impacts expenditures; actual savings also depend on benchmark and quality performance.")
         else:
             st.info("No valid utilization data for attribution analysis.")
-        # 1. Quality Gates & Flags
         st.markdown("### Quality Gates & Program Flags")
         st.write("Key indicators for meeting MSSP quality requirements and adjustments (PY 2023).")
         quality_gates = [
@@ -1549,7 +1469,6 @@ elif tab_selection == "Single ACO View":
         ]
         df_gates = pd.DataFrame(quality_gates)
         st.dataframe(df_gates, use_container_width=True, hide_index=True)
-        # 2. Quality Program Measures
         st.markdown("### Quality Program Measures")
         st.write("Individual quality measures with scores, track average, all-ACOs average, and % difference. Readmission/admission rates formatted as % (lower is better).")
         quality_measures = [
@@ -1567,7 +1486,7 @@ elif tab_selection == "Single ACO View":
             {"Measure": "Controlling High Blood Pressure", "col": "QualityID_236_WI", "lower_better": False, "is_rate": False},
         ]
         quality_table = []
-        chart_data = [] # For bar chart
+        chart_data = []
         for m in quality_measures:
             col = m["col"]
             if col not in df.columns:
@@ -1577,7 +1496,6 @@ elif tab_selection == "Single ACO View":
             all_aco_avg_val = df[col].mean(skipna=True)
             pct_diff_track = (this_aco_val - track_avg_val) / track_avg_val if pd.notna(track_avg_val) and track_avg_val != 0 else np.nan
             pct_diff_all = (this_aco_val - all_aco_avg_val) / all_aco_avg_val if pd.notna(all_aco_avg_val) and all_aco_avg_val != 0 else np.nan
-            # Format as % for rate measures, otherwise as %
             if m["is_rate"]:
                 this_fmt = f"{this_aco_val*100:.2f}%" if pd.notna(this_aco_val) else "N/A"
                 track_fmt = f"{track_avg_val*100:.2f}%" if pd.notna(track_avg_val) else "N/A"
@@ -1594,7 +1512,6 @@ elif tab_selection == "Single ACO View":
                 "All ACOs Avg": all_fmt,
                 "% Diff vs All": f"{pct_diff_all*100:.1f}%" if pd.notna(pct_diff_all) else "N/A"
             })
-            # Add to chart data (use raw values for plotting)
             chart_data.append({
                 "Measure": m["Measure"],
                 "This ACO": this_aco_val,
@@ -1605,7 +1522,6 @@ elif tab_selection == "Single ACO View":
         if quality_table:
             df_quality = pd.DataFrame(quality_table)
             st.dataframe(df_quality, use_container_width=True, hide_index=True)
-            # Bar chart visualization
             if chart_data:
                 df_chart = pd.DataFrame(chart_data)
                 df_chart_melt = df_chart.melt(id_vars=["Measure", "Lower Better"], var_name="Comparison", value_name="Score")
@@ -1623,7 +1539,6 @@ elif tab_selection == "Single ACO View":
                 st.plotly_chart(fig_quality, use_container_width=True)
         else:
             st.info("No quality measure columns found.")
-        # 3. Patient Experience (CAHPS) Measures
         st.markdown("### Patient Experience (CAHPS) Measures")
         st.write("CAHPS domain scores (higher is better) vs track and all-ACOs averages.")
         cahps_map = {
@@ -1639,7 +1554,7 @@ elif tab_selection == "Single ACO View":
             "CAHPS_8": "Care Coordination"
         }
         cahps_table = []
-        chart_data = [] # For bar chart
+        chart_data = []
         for raw_col, friendly_name in cahps_map.items():
             col = raw_col
             if col not in df.columns:
@@ -1666,7 +1581,6 @@ elif tab_selection == "Single ACO View":
         if cahps_table:
             df_cahps = pd.DataFrame(cahps_table)
             st.dataframe(df_cahps, use_container_width=True, hide_index=True)
-            # Bar chart visualization
             if chart_data:
                 df_chart = pd.DataFrame(chart_data)
                 df_chart_melt = df_chart.melt(id_vars="CAHPS Domain", var_name="Comparison", value_name="Score")
@@ -1685,49 +1599,39 @@ elif tab_selection == "Single ACO View":
         else:
             st.info("No CAHPS columns found in data.")
 
-elif tab_selection == "Program Changes":
+elif selected == "Program Changes":
     st.subheader("MSSP Program Changes: PY 2022 to PY 2023")
-   
-    # High-level narrative
     st.markdown("""
     The Medicare Shared Savings Program (MSSP) for Performance Year (PY) 2023 incorporated several enhancements from the Calendar Year (CY) 2023 Physician Fee Schedule (PFS) Final Rule to promote program growth, equity, and participation—particularly for ACOs serving rural, underserved, or high-risk populations. These built on prior reforms (e.g., Pathways to Success) while addressing trends like plateaued ACO growth, underrepresentation of high-spending beneficiaries, and access disparities for minority groups.
-   
+    
     Key PY 2023 impacts included a shift to sliding-scale quality scoring (replacing all-or-nothing thresholds), expanded beneficiary assignment codes, and continued COVID-related flexibilities (e.g., EUC adjustments). These directly affect PUF-reported metrics like QualScore, EarnSaveLoss, Sav_rate, and assignment (N_AB). Overall, PY 2023 ACOs delivered record net savings to Medicare ($2.1B) and improved on many quality measures compared to PY 2022.
     """)
-   
-    # Bullet sections
     st.markdown("### Quality Program & Scoring")
     st.markdown("""
     - Transitioned from all-or-nothing quality performance standard to a sliding-scale approach for shared savings eligibility (effective PY 2023): ACOs below minimum thresholds still qualify for partial savings based on quality score + health equity adjustment bonus (up to 10 points for serving underserved populations when reporting all-payer measures).
     - Extended incentives for eCQM/MIPS CQM reporting through PY 2024.
     - Maintained health equity adjustment eligibility for ACOs with ≥20% beneficiaries in affected counties or legal entity in such areas (all ACOs received DisAffQual=1 in PY 2023 due to ongoing PHE for COVID-19).
     """)
-   
     st.markdown("### Beneficiary Assignment & Eligibility")
     st.markdown("""
     - Expanded primary care service codes eligible for prospective assignment (e.g., prolonged services, chronic pain management, certain behavioral health codes).
     - Updated facility IDs (e.g., FQHCs/RHCs) to account for mid-year changes in assignment methodology.
     """)
-   
     st.markdown("### Financial & Benchmark Impacts (for PY 2023)")
     st.markdown("""
     - No major benchmark methodology overhaul in PY 2023 (major prospective trend/ACPT and other adjustments apply starting agreement periods from Jan 1, 2024).
     - Continued exclusion of certain IHS/Tribal/Puerto Rico supplement payments from FFS calculations but inclusion in revenue determinations.
     """)
-   
     st.markdown("### Other Operational & Administrative")
     st.markdown("""
     - Reduced administrative burden: No pre-approval required for marketing materials; beneficiary notifications once per agreement period; simplified SNF 3-day rule waiver applications.
     - Data reporting: Continued use of CMS Web Interface (with phase-out planned later); CAHPS and claims-based measures unchanged for PY 2023.
     """)
-   
     st.markdown("### Program Outcomes & Trends (PY 2023 vs PY 2022)")
     st.markdown("""
     - ACOs improved on required quality measures (e.g., diabetes/blood pressure control, cancer screenings, fall risk, statin therapy, depression screening/follow-up).
     - Record savings: Over Two Billion net to Medicare, with ACOs earning over Three Billion in shared savings payments.
     """)
-   
-    # Links section
     st.markdown("### Helpful Links to CMS Resources")
     st.markdown("""
     - [PY 2023 Financial and Quality Results PUF](https://data.cms.gov/medicare-shared-savings-program/performance-year-financial-and-quality-results) — Direct download for the data file used in this app.
@@ -1737,8 +1641,6 @@ elif tab_selection == "Program Changes":
     - [MSSP Program Overview & FAQs](https://www.cms.gov/medicare/payment/fee-for-service-providers/shared-savings-program-ssp-acos) — General resources and application info.
     - [PY 2023 Performance Results Press Release](https://www.cms.gov/newsroom/press-releases/medicare-shared-savings-program-continues-deliver-meaningful-savings-and-high-quality-health-care) — Outcomes and quality improvements.
     """)
-   
-    # Table (use st.table or markdown for simplicity)
     st.markdown("### Table: Key Technical/Data Changes in PY 2023 PUF (vs Prior Years)")
     changes_data = {
         "Aspect": ["Quality Scoring", "EUC/DisAffQual", "Assignment Codes", "Risk/County Data", "Savings/Losses Calc"],
