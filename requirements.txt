@@ -4,4 +4,5 @@ plotly
 statsmodels
 numpy
 python-pptx
+streamlit-option-menu==0.4.0  # ← add this line (exact version you installed locally)
 
