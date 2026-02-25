@@ -344,7 +344,7 @@ def fmt_date(x):
         return str(x)
 
 # ── Page config & banner ─────────────────────────────────────────────────────
-st.set_page_config(page_title="MSSP 2023 Dashboard", layout="wide")
+st.set_page_config(page_title="MSSP 2023 Dashboard", layout="wide", initial_sidebar_state="auto")
 
 # ── Fixed banner CSS ─────────────────────────────────────────────────────────
 st.markdown(f"""
@@ -392,9 +392,9 @@ st.markdown("""
 # ── Clean Navigation with streamlit-option-menu ──────────────────────────────
 with st.sidebar:
     selected = option_menu(
-        menu_title="MSSP PY 2023 Dashboard",
+        menu_title="Navigation",
         options=["Program Changes", "Overview", "Single ACO View"],
-        icons=["file-earmark-text", "bar-chart-line-fill", "search"],  # Bootstrap-style icons
+        icons=["arrow-clockwise", "map-fill", "clipboard-pulse"],  # Bootstrap-style icons
         menu_icon="cast",
         default_index=1,  # Start on Overview
         orientation="vertical",
