@@ -1153,50 +1153,47 @@ elif selected == "Single ACO View":
             st.dataframe(df_snf, use_container_width=True, hide_index=True)
         else:
             st.info("No SNF columns found (P_SNF_ADM, CapAnn_SNF, SNF_LOS missing).")
+
         st.markdown("### Emergency Department (ED) Utilization")
-        st.write("ED visits per 1,000 person-years and % leading to hospitalization vs average across all ACOs. Deviations >20% highlighted.")
+        st.write("ED visits per 1,000 person-years and % leading to hospitalization vs average across all ACOs.")
         ed_data = []
         if "P_EDV_Vis" in df.columns:
             this_aco_ed_vis = aco_data.get("P_EDV_Vis", np.nan)
             all_aco_avg_ed_vis = df["P_EDV_Vis"].mean() if "P_EDV_Vis" in df.columns else np.nan
             pct_diff_vis = (this_aco_ed_vis - all_aco_avg_ed_vis) / all_aco_avg_ed_vis if pd.notna(all_aco_avg_ed_vis) and all_aco_avg_ed_vis != 0 else np.nan
             deviation_vis = f"{pct_diff_vis*100:.1f}%" if pd.notna(pct_diff_vis) else "N/A"
-            alert_vis = "High" if pct_diff_vis > 0.20 else "Low" if pct_diff_vis < -0.20 else ""
+
             ed_data.append({
                 "Metric": "ED Visits per 1,000 Person-Years",
                 "This ACO": f"{this_aco_ed_vis:.1f}" if pd.notna(this_aco_ed_vis) else "N/A",
                 "All ACOs Avg": f"{all_aco_avg_ed_vis:.1f}" if pd.notna(all_aco_avg_ed_vis) else "N/A",
                 "% Difference": deviation_vis,
-                "Alert": alert_vis
             })
+
         if "P_EDV_Vis_HOSP" in df.columns:
             this_aco_ed_vis = aco_data.get("P_EDV_Vis_HOSP", np.nan)
             all_aco_avg_ed_vis = df["P_EDV_Vis_HOSP"].mean() if "P_EDV_Vis_HOSP" in df.columns else np.nan
             pct_diff_vis = (this_aco_ed_vis - all_aco_avg_ed_vis) / all_aco_avg_ed_vis if pd.notna(all_aco_avg_ed_vis) and all_aco_avg_ed_vis != 0 else np.nan
             deviation_vis = f"{pct_diff_vis*100:.1f}%" if pd.notna(pct_diff_vis) else "N/A"
-            alert_vis = "High" if pct_diff_vis > 0.20 else "Low" if pct_diff_vis < -0.20 else ""
+
             ed_data.append({
                 "Metric": "ED Visits Leading to Hospitalization per 1,000 Person-Years",
                 "This ACO": f"{this_aco_ed_vis:.1f}" if pd.notna(this_aco_ed_vis) else "N/A",
                 "All ACOs Avg": f"{all_aco_avg_ed_vis:.1f}" if pd.notna(all_aco_avg_ed_vis) else "N/A",
                 "% Difference": deviation_vis,
-                "Alert": alert_vis
+
             })
+
         if ed_data:
             df_ed = pd.DataFrame(ed_data)
-            def highlight_alert(row):
-                if row["Alert"] == "High":
-                    return ['background-color: #ffcccc'] * len(row)
-                elif row["Alert"] == "Low":
-                    return ['background-color: #ccffcc'] * len(row)
-                return [''] * len(row)
             st.dataframe(
-                df_ed.style.apply(highlight_alert, axis=1),
+                df_ed,
                 use_container_width=True,
                 hide_index=True
             )
         else:
             st.info("ED columns (P_EDV_Vis and/or P_EDV_Vis_Hosp) not found in data.")
+
         st.markdown("### Primary Care Services")
         st.write("E&M visits per 1,000 person-years by provider type vs average across all ACOs.")
         pcp_metrics = [
@@ -1337,122 +1334,8 @@ elif selected == "Single ACO View":
             st.plotly_chart(fig_scat_per, use_container_width=True)
         else:
             st.info("Missing columns for per-beneficiary scatter plot (P_EM_PCP_Vis, BnchmkMinExp, N_AB_Year_PY, ACO_ID).")
-        st.markdown("### Utilization Comparison")
-        st.write("Bar chart of per capita cost across all ACOs (ascending order: lowest/left = most efficient → highest/right = least efficient). Selected ACO highlighted in theme color.")
-        for cat, cost_col in capann_cols.items():
-            if cost_col not in df.columns:
-                continue
-            all_df = df.copy()
-            all_df[cost_col] = pd.to_numeric(all_df[cost_col], errors='coerce')
-            all_df = all_df.sort_values(cost_col, ascending=True, na_position='last').reset_index(drop=True)
-            all_df["Highlight"] = all_df["ACO_ID"] == aco_data["ACO_ID"]
-            all_df["Color"] = all_df["Highlight"].map({True: PRIMARY, False: NEUTRAL})
-            all_df["Index"] = all_df.index
-            fig_bar = px.bar(
-                all_df,
-                x="Index",
-                y=cost_col,
-                color="Color",
-                color_discrete_map={PRIMARY: PRIMARY, NEUTRAL: NEUTRAL},
-                title=f"{cat} – Per Capita Cost Across All ACOs (Selected ACO in Theme Color)",
-                labels={cost_col: "Per Capita Cost ($)"},
-                hover_data=["ACO_Name", cost_col]
-            )
-            ticktext = ["" for _ in all_df.index]
-            if all_df["Highlight"].any():
-                selected_idx = all_df[all_df["Highlight"]].index[0]
-                ticktext[selected_idx] = aco_data["ACO_Name"]
-            fig_bar.update_layout(
-                template=PLOTLY_TEMPLATE,
-                xaxis={
-                    'tickmode': 'array',
-                    'tickvals': list(range(len(all_df))),
-                    'ticktext': ticktext,
-                },
-                xaxis_tickangle=-45,
-                showlegend=False,
-                height=500
-            )
-            fig_bar.update_traces(hovertemplate="%{customdata[0]}<br>Per Capita Cost: $%{y:,.0f}")
-            st.plotly_chart(fig_bar, use_container_width=True)
-        st.markdown("### Outlier Detection in Admissions & LOS")
-        st.write("Services where the ACO deviates >20% from track average (threshold for highlighting).")
-        outlier_data = []
-        outlier_threshold = 0.20
-        st.caption(f"**Threshold**: >{outlier_threshold*100}% deviation from track average (absolute value).")
-        if all(col in aco_data for col in ["ADM_INP_All", "N_AB"]) and aco_data["N_AB"] > 0:
-            adm_per_1000 = aco_data["ADM_INP_All"] / aco_data["N_AB"] * 1000
-            track_adm_per_1000 = track_avg["ADM_INP_All"] / track_avg["N_AB"] * 1000 if track_avg["N_AB"] > 0 else np.nan
-            pct_diff = (adm_per_1000 - track_adm_per_1000) / track_adm_per_1000 if pd.notna(track_adm_per_1000) and track_adm_per_1000 != 0 else np.nan
-            if abs(pct_diff) > outlier_threshold:
-                outlier_data.append({
-                    "Service": "Inpatient Admissions per 1,000",
-                    "This ACO": f"{adm_per_1000:.1f}",
-                    "Track Avg": f"{track_adm_per_1000:.1f}",
-                    "% Deviation": f"{pct_diff*100:.1f}%",
-                    "Alert": "High" if pct_diff > 0 else "Low"
-                })
-        if all(col in aco_data for col in ["ADM_OPD", "N_AB"]) and aco_data["N_AB"] > 0:
-            adm_per_1000 = aco_data["ADM_OPD"] / aco_data["N_AB"] * 1000
-            track_adm_per_1000 = track_avg["ADM_OPD"] / track_avg["N_AB"] * 1000 if track_avg["N_AB"] > 0 else np.nan
-            pct_diff = (adm_per_1000 - track_adm_per_1000) / track_adm_per_1000 if pd.notna(track_adm_per_1000) and track_adm_per_1000 != 0 else np.nan
-            if abs(pct_diff) > outlier_threshold:
-                outlier_data.append({
-                    "Service": "Outpatient Visits per 1,000",
-                    "This ACO": f"{adm_per_1000:.1f}",
-                    "Track Avg": f"{track_adm_per_1000:.1f}",
-                    "% Deviation": f"{pct_diff*100:.1f}%",
-                    "Alert": "High" if pct_diff > 0 else "Low"
-                })
-        if all(col in aco_data for col in ["ADM_PB", "N_AB"]) and aco_data["N_AB"] > 0:
-            adm_per_1000 = aco_data["ADM_PB"] / aco_data["N_AB"] * 1000
-            track_adm_per_1000 = track_avg["ADM_PB"] / track_avg["N_AB"] * 1000 if track_avg["N_AB"] > 0 else np.nan
-            pct_diff = (adm_per_1000 - track_adm_per_1000) / track_adm_per_1000 if pd.notna(track_adm_per_1000) and track_adm_per_1000 != 0 else np.nan
-            if abs(pct_diff) > outlier_threshold:
-                outlier_data.append({
-                    "Service": "Physician/Supplier Visits per 1,000",
-                    "This ACO": f"{adm_per_1000:.1f}",
-                    "Track Avg": f"{track_adm_per_1000:.1f}",
-                    "% Deviation": f"{pct_diff*100:.1f}%",
-                    "Alert": "High" if pct_diff > 0 else "Low"
-                })
-        if "SNF_LOS" in aco_data and pd.notna(aco_data["SNF_LOS"]):
-            snf_los = aco_data["SNF_LOS"]
-            track_snf_los = track_avg["SNF_LOS"] if pd.notna(track_avg["SNF_LOS"]) else np.nan
-            pct_diff = (snf_los - track_snf_los) / track_snf_los if pd.notna(track_snf_los) and track_snf_los != 0 else np.nan
-            if abs(pct_diff) > outlier_threshold:
-                outlier_data.append({
-                    "Service": "SNF Length of Stay (days)",
-                    "This ACO": f"{snf_los:.1f}",
-                    "Track Avg": f"{track_snf_los:.1f}",
-                    "% Deviation": f"{pct_diff*100:.1f}%",
-                    "Alert": "High" if pct_diff > 0 else "Low"
-                })
-        if outlier_data:
-            outlier_df = pd.DataFrame(outlier_data)
-            st.dataframe(outlier_df, use_container_width=True, hide_index=True)
-        else:
-            st.success("No significant outliers detected (>20% deviation from track average).")
-        st.markdown("### Savings Attribution to Utilization Reduction")
-        st.write("Estimated contribution of lower utilization to savings (compared to track average). Calculation: (Track Avg Per Capita - ACO Per Capita) × N_AB. Positive = contributed to savings; negative = increased costs.")
-        attribution_data = []
-        for cat, cost_col in capann_cols.items():
-            if cost_col not in df.columns or pd.isna(aco_data[cost_col]) or pd.isna(track_avg[cost_col]):
-                continue
-            delta_per_capita = track_avg[cost_col] - aco_data[cost_col]
-            contribution = delta_per_capita * aco_data["N_AB"] if aco_data["N_AB"] > 0 else 0
-            attribution_data.append({
-                "Service Category": cat,
-                "Delta vs Track Avg (Per Capita)": fmt_dollars(delta_per_capita, 0),
-                "Estimated Contribution to Savings": fmt_dollars(contribution, 0),
-                "Note": "Positive = lower utilization helped savings" if contribution > 0 else "Negative = higher utilization reduced savings"
-            })
-        if attribution_data:
-            attribution_df = pd.DataFrame(attribution_data)
-            st.dataframe(attribution_df, use_container_width=True, hide_index=True)
-            st.caption("**Calculation Note**: Contribution = (Track Avg Per Capita - ACO Per Capita) × Assigned Beneficiaries (N_AB). Assumes utilization delta directly impacts expenditures; actual savings also depend on benchmark and quality performance.")
-        else:
-            st.info("No valid utilization data for attribution analysis.")
+
+
         st.markdown("### Quality Gates & Program Flags")
         st.write("Key indicators for meeting MSSP quality requirements and adjustments (PY 2023).")
         quality_gates = [
