@@ -395,7 +395,7 @@ with st.sidebar:
         menu_title="Navigation",
         options=["Program Changes", "Overview", "Single ACO View"],
         icons=["arrow-clockwise", "map-fill", "clipboard-pulse"],  # Bootstrap-style icons
-        menu_icon="cast",
+        menu_icon='<img src="https://raw.githubusercontent.com/trynytyhealthSmithson/mssp-2023-dashboard/main/transparent_logo.png" alt="Trynyty Health Logo" style="width:180px; height:auto; display:block; margin:0 auto;">', #transparent_logo.png
         default_index=1,  # Start on Overview
         orientation="vertical",
         styles={
