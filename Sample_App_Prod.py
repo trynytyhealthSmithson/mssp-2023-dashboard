@@ -1231,10 +1231,11 @@ elif selected == "Single ACO View":
         if all(col in df.columns for col in ["P_EM_PCP_Vis", "BnchmkMinExp", "QualScore", "N_AB", "ACO_Name", "ACO_ID"]):
             plot_df = df.copy()
             plot_df = plot_df[plot_df["P_EM_PCP_Vis"].notna() & plot_df["BnchmkMinExp"].notna() & plot_df["QualScore"].notna() & plot_df["N_AB"].notna()]
+            plot_df["Raw_Savings_Per_Benef"] = plot_df["BnchmkMinExp"] / plot_df["N_AB_Year_PY"]
             fig_scat = px.scatter(
                 plot_df,
                 x="P_EM_PCP_Vis",
-                y="BnchmkMinExp",
+                y="Raw_Savings_Per_Benef",
                 size="N_AB",
                 color="QualScore",
                 color_continuous_scale="RdYlGn",
@@ -1244,7 +1245,7 @@ elif selected == "Single ACO View":
                 hover_name="ACO_Name",
                 hover_data={
                     "P_EM_PCP_Vis": ":.1f",
-                    "BnchmkMinExp": ":$,.0f",
+                    "Raw_Savings_Per_Benef": ":$,.0f",
                     "QualScore": ":.1f",
                     "N_AB": ":,",
                     "Current_Track": True
@@ -1252,13 +1253,13 @@ elif selected == "Single ACO View":
                 title="PCP E&M Visits per 1,000 vs Raw Savings<br>Bubble size = Assigned Beneficiaries; Color = Quality Score",
                 labels={
                     "P_EM_PCP_Vis": "PCP E&M Visits per 1,000 Person-Years",
-                    "BnchmkMinExp": "Raw Savings ($)"
+                    "Raw_Savings_Per_Benef": "Raw Savings Per Beneficiary ($)"
                 }
             )
             selected_row = plot_df[plot_df["ACO_ID"] == aco_data["ACO_ID"]]
             if not selected_row.empty:
                 x_val = selected_row["P_EM_PCP_Vis"].iloc[0]
-                y_val = selected_row["BnchmkMinExp"].iloc[0]
+                y_val = selected_row["Raw_Savings_Per_Benef"].iloc[0]
                 aco_name = selected_row["ACO_Name"].iloc[0]
                 fig_scat.add_annotation(
                     x=x_val,
@@ -1280,6 +1281,7 @@ elif selected == "Single ACO View":
             st.plotly_chart(fig_scat, use_container_width=True)
         else:
             st.info("Missing columns for scatter plot (P_EM_PCP_Vis, BnchmkMinExp, QualScore, N_AB, ACO_ID).")
+
         st.markdown("### PCP Services vs Raw Savings Per Beneficiary")
         st.write("Scatter plot across all ACOs: PCP E&M visits per 1,000 person-years vs raw savings per beneficiary. Selected ACO bubble larger (scaled by risk score). Trend line added.")
         if all(col in df.columns for col in ["P_EM_PCP_Vis", "BnchmkMinExp", "N_AB_Year_PY", "ACO_Name", "ACO_ID"]):
