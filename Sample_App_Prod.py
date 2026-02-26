@@ -1337,6 +1337,44 @@ elif selected == "Single ACO View":
         else:
             st.info("Missing columns for per-beneficiary scatter plot (P_EM_PCP_Vis, BnchmkMinExp, N_AB_Year_PY, ACO_ID).")
 
+        st.markdown("### Utilization Comparison")
+        st.write("Bar chart of per capita cost across all ACOs (ascending order: lowest/left = most efficient → highest/right = least efficient). Selected ACO highlighted in theme color.")
+        for cat, cost_col in capann_cols.items():
+            if cost_col not in df.columns:
+                continue
+            all_df = df.copy()
+            all_df[cost_col] = pd.to_numeric(all_df[cost_col], errors='coerce')
+            all_df = all_df.sort_values(cost_col, ascending=True, na_position='last').reset_index(drop=True)
+            all_df["Highlight"] = all_df["ACO_ID"] == aco_data["ACO_ID"]
+            all_df["Color"] = all_df["Highlight"].map({True: PRIMARY, False: NEUTRAL})
+            all_df["Index"] = all_df.index
+            fig_bar = px.bar(
+                all_df,
+                x="Index",
+                y=cost_col,
+                color="Color",
+                color_discrete_map={PRIMARY: PRIMARY, NEUTRAL: NEUTRAL},
+                title=f"{cat} – Per Capita Cost Across All ACOs (Selected ACO in Theme Color)",
+                labels={cost_col: "Per Capita Cost ($)"},
+                hover_data=["ACO_Name", cost_col]
+            )
+            ticktext = ["" for _ in all_df.index]
+            if all_df["Highlight"].any():
+                selected_idx = all_df[all_df["Highlight"]].index[0]
+                ticktext[selected_idx] = aco_data["ACO_Name"]
+            fig_bar.update_layout(
+                template=PLOTLY_TEMPLATE,
+                xaxis={
+                    'tickmode': 'array',
+                    'tickvals': list(range(len(all_df))),
+                    'ticktext': ticktext,
+                },
+                xaxis_tickangle=-45,
+                showlegend=False,
+                height=500
+            )
+            fig_bar.update_traces(hovertemplate="%{customdata[0]}<br>Per Capita Cost: $%{y:,.0f}")
+            st.plotly_chart(fig_bar, use_container_width=True)
 
         st.markdown("### Quality Gates & Program Flags")
         st.write("Key indicators for meeting MSSP quality requirements and adjustments (PY 2023).")
